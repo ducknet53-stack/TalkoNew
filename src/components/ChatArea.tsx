@@ -123,6 +123,38 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     }
   }, [isOtherUserTyping]);
 
+  // Reset our typing status on unmount or chat change
+  useEffect(() => {
+    return () => {
+      if (currentUser && chat.id && !isSystemChat) {
+        const typingRef = doc(db, `chats/${chat.id}/typing`, currentUser.uid);
+        setDoc(typingRef, { isTyping: false, timestamp: Date.now() }).catch(err => {
+          console.error("Error clearing typing on unmount:", err);
+        });
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [chat.id, currentUser, isSystemChat]);
+
+  // Auto scroll to bottom when keyboard resizes the viewport
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleResize = () => {
+      const container = scrollContainerRef.current;
+      if (container) {
+        scrollToBottom('smooth');
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   useEffect(() => {
     if (isSystemChat || !otherUserId || !currentUser) return;
 
@@ -177,12 +209,26 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
   };
 
   const handleSendMessage = async (text: string, imageUrl: string | null = null) => {
-    if ((!text.trim() && !imageUrl) || !currentUser) return;
+    const messageText = text.trim();
+    if ((!messageText && !imageUrl) || !currentUser) return;
     
     if (isSystemChat) {
       toast.error("Talko Destek hesabına yanıt gönderilemez.");
       return;
     }
+
+    // Immediately clear input and reset emoji picker for a fast native-like response
+    if (!imageUrl) {
+      setInputText('');
+    }
+    setShowEmojiPicker(false);
+
+    // Immediately clear local and firestore typing status
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    const typingRef = doc(db, `chats/${chat.id}/typing`, currentUser.uid);
+    setDoc(typingRef, { isTyping: false, timestamp: Date.now() }).catch(err => {
+      console.error("Error clearing typing status on send:", err);
+    });
 
     const now = Date.now();
     const messageId = now.toString() + Math.random().toString(36).substring(2, 5);
@@ -192,29 +238,25 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
       await setDoc(messageRef, {
         id: messageId,
         senderId: currentUser.uid,
-        text: text.trim() || null,
+        text: messageText || null,
         imageUrl,
         timestamp: now
       });
 
       const chatRef = doc(db, 'chats', chat.id);
       await updateDoc(chatRef, {
-        lastMessage: text.trim() || (imageUrl ? '📷 Görsel' : ''),
+        lastMessage: messageText || (imageUrl ? '📷 Görsel' : ''),
         lastMessageTimestamp: now,
         updatedAt: now
       });
-
-      setInputText('');
-      setShowEmojiPicker(false);
-      
-      // Clear typing status
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      const typingRef = doc(db, `chats/${chat.id}/typing`, currentUser.uid);
-      setDoc(typingRef, { isTyping: false, timestamp: Date.now() });
       
     } catch (err) {
       console.error(err);
       toast.error("Mesaj gönderilemedi.");
+      // Restore input text if send failed so user doesn't lose it
+      if (!imageUrl) {
+        setInputText(messageText);
+      }
     }
   };
 
@@ -314,14 +356,37 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
                 </div>
               )}
               
-              <div className={cn(
-                "max-w-[75%] md:max-w-[65%] min-w-0 rounded-2xl px-4 py-2.5 shadow-sm relative group break-words [overflow-wrap:anywhere] [word-break:break-word]",
-                isMine ? "bg-blue-600 text-white rounded-br-sm" : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-100 dark:border-gray-700 rounded-bl-sm"
-              )}>
-                {msg.imageUrl && (
-                  <img src={msg.imageUrl} alt="Shared" className="max-w-full rounded-xl mb-2 object-cover max-h-64 cursor-pointer hover:opacity-95 transition-opacity" />
+              <div 
+                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                className={cn(
+                  "max-w-[75%] md:max-w-[65%] min-w-0 rounded-2xl px-4 py-2.5 shadow-sm relative group break-words",
+                  isMine ? "bg-blue-600 text-white rounded-br-sm" : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-100 dark:border-gray-700 rounded-bl-sm"
                 )}
-                {msg.text && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] text-[15px] leading-relaxed">{msg.text}</p>}
+              >
+                {msg.imageUrl && (
+                  <img 
+                    src={msg.imageUrl} 
+                    alt="Shared" 
+                    onLoad={() => {
+                      const container = scrollContainerRef.current;
+                      if (container) {
+                        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 250;
+                        if (isNearBottom) {
+                          scrollToBottom('smooth');
+                        }
+                      }
+                    }}
+                    className="max-w-full rounded-xl mb-2 object-cover max-h-64 cursor-pointer hover:opacity-95 transition-opacity" 
+                  />
+                )}
+                {msg.text && (
+                  <p 
+                    style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                    className="whitespace-pre-wrap break-words text-[15px] leading-relaxed"
+                  >
+                    {msg.text}
+                  </p>
+                )}
                 
                 <span className={cn(
                   "text-[10px] mt-1 block",
@@ -346,7 +411,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
       </div>
 
       {isSystemChat ? (
-        <div className="p-4 bg-gray-50 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800 flex items-center justify-center">
+        <div className="p-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))] bg-gray-50 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800 flex items-center justify-center">
           <div className="max-w-md w-full bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl p-4 flex gap-3 shadow-sm">
             <span className="text-xl select-none" role="img" aria-label="lock">🔒</span>
             <div className="text-left">
@@ -360,7 +425,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
           </div>
         </div>
       ) : (
-        <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+        <div className="p-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
           <form 
             onSubmit={(e) => { e.preventDefault(); handleSendMessage(inputText); }}
             className="flex items-end gap-2 relative"

@@ -1,8 +1,12 @@
 export async function uploadImage(file: File): Promise<string | null> {
-  const apiKey = import.meta.env.VITE_IMGBB_API_KEY;
+  const apiKey = 
+    (import.meta.env && import.meta.env.VITE_IMGBB_API_KEY) || 
+    (typeof process !== 'undefined' && process.env && process.env.VITE_IMGBB_API_KEY) || 
+    '';
+
   if (!apiKey) {
     console.error("VITE_IMGBB_API_KEY is not set in environment variables.");
-    throw new Error("ImgBB API key is missing");
+    throw new Error("Lütfen ayarlardan ImgBB API anahtarınızı (VITE_IMGBB_API_KEY) ekleyin.");
   }
 
   const formData = new FormData();

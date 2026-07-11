@@ -51,7 +51,7 @@ export default function MainLayout() {
         />
       </div>
       
-      <div className={`flex-1 h-full ${!isSidebarOpen ? 'block' : 'hidden md:block'}`}>
+      <div className={`flex-1 min-w-0 h-full ${!isSidebarOpen ? 'block' : 'hidden md:block'}`}>
         {activeChat ? (
           <ChatArea 
             chat={activeChat} 
