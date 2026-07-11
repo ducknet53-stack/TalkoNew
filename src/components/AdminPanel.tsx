@@ -285,7 +285,7 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden relative">
+    <div className="h-full w-full bg-slate-950 text-slate-100 flex flex-col font-sans overflow-y-auto overflow-x-hidden relative">
       {/* Header */}
       <header className="bg-slate-900/80 border-b border-slate-800 backdrop-blur-md sticky top-0 z-30 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
