@@ -237,8 +237,9 @@ export default function AdminPanel() {
         <div className="max-w-md w-full bg-slate-850/60 backdrop-blur-md rounded-3xl border border-slate-700/50 p-8 shadow-2xl relative overflow-hidden my-auto">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-cyan-500" />
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/5">
-              <Fingerprint size={32} className="animate-pulse" />
+            <div className="w-20 h-20 mx-auto mb-5 relative group flex items-center justify-center">
+              <div className="absolute inset-0 bg-blue-500/20 rounded-2xl blur-md group-hover:blur-lg transition-all duration-300 animate-pulse" />
+              <img src={TALKO_LOGO_DATA_URL} alt="Talko Logo" className="w-20 h-20 rounded-2xl border border-blue-500/30 shadow-lg shadow-blue-500/10 relative z-10 hover:scale-105 transition-transform duration-300 select-none pointer-events-none" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-white mb-2">Talko Yönetim Paneli</h1>
             <p className="text-sm text-slate-400">Güvenlik ve denetim paneline erişmek için şifreyi girin</p>
@@ -266,7 +267,7 @@ export default function AdminPanel() {
               type="submit"
               className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/20 active:scale-98 transition-all flex items-center justify-center gap-2"
             >
-              <Fingerprint size={18} />
+              <KeyRound size={18} />
               Giriş Yap
             </button>
           </form>
@@ -284,13 +285,11 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="fixed inset-0 overflow-y-auto bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden relative">
       {/* Header */}
       <header className="bg-slate-900/80 border-b border-slate-800 backdrop-blur-md sticky top-0 z-30 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center text-blue-400">
-            <Fingerprint size={20} />
-          </div>
+          <img src={TALKO_LOGO_DATA_URL} alt="Talko Logo" className="w-10 h-10 rounded-xl border border-blue-500/20 shadow-md shadow-blue-500/5 select-none pointer-events-none" />
           <div>
             <h1 className="font-bold text-lg text-white flex items-center gap-2">
               Talko Yönetim Paneli

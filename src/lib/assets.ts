@@ -2,31 +2,33 @@ export const TALKO_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="
   <!-- Rounded blue background -->
   <rect width="1000" height="1000" rx="220" fill="#0066ff" />
   
-  <!-- White speech bubble -->
-  <path d="M 320 230 
-           H 680 
-           C 780 230, 810 260, 810 360 
-           C 810 460, 780 490, 680 490 
-           H 450 
-           L 330 610 
-           V 490 
-           C 220 490, 190 460, 190 360 
-           C 190 260, 220 230, 320 230 Z" 
+  <!-- White speech bubble with perfect symmetry and proportions -->
+  <path d="M 370 260 
+           H 630 
+           A 140 140 0 0 1 770 400 
+           V 510 
+           A 140 140 0 0 1 630 650 
+           H 470 
+           L 350 730 
+           V 650 
+           A 120 120 0 0 1 230 530 
+           V 400 
+           A 140 140 0 0 1 370 260 Z" 
         fill="white" />
   
-  <!-- Stylized blue T -->
+  <!-- Stylized blue T centered nicely inside the speech bubble -->
   <!-- Top bar of the T -->
-  <rect x="292" y="325" width="418" height="92" rx="22" fill="#0066ff" />
+  <rect x="320" y="345" width="360" height="80" rx="20" fill="#0066ff" />
   
-  <!-- Stem of the T (slanted, leaning down-left) -->
-  <path d="M 415 417 
-           L 376 615 
-           L 500 550 
-           L 550 417 Z" 
+  <!-- Stem of the T (slanted, leaning down-left) inside bubble bounds -->
+  <path d="M 425 425 
+           L 390 585 
+           L 490 535 
+           L 540 425 Z" 
         fill="#0066ff" />
         
   <!-- Parallel accent dash on the right -->
-  <rect x="555" y="425" width="115" height="52" rx="15" fill="#0066ff" />
+  <rect x="545" y="432" width="100" height="46" rx="14" fill="#0066ff" />
 </svg>`;
 
 export const TALKO_LOGO_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent(TALKO_LOGO_SVG)}`;
