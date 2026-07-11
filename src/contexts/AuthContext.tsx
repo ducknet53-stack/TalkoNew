@@ -45,6 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user) {
         const userRef = doc(db, 'users', user.uid);
         
+        // Auto-elevate developer email as admin in Firestore database
+        if (user.email === 'ducknet53@gmail.com') {
+          await setDoc(userRef, { isAdmin: true }, { merge: true })
+            .catch(err => console.error("Could not auto-elevate admin status:", err));
+        }
+        
         let welcomeChecked = false;
         // Listen to profile updates
         unsubscribeProfile = onSnapshot(userRef, (docSnap) => {

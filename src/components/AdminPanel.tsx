@@ -61,6 +61,17 @@ export default function AdminPanel() {
     toast.success('Admin oturumu kapatıldı.');
   };
 
+  // Auto-ensure admin role in Firestore if authorized
+  useEffect(() => {
+    if (isAuthorized && currentUser) {
+      updateDoc(doc(db, 'users', currentUser.uid), {
+        isAdmin: true
+      }).catch(err => {
+        console.error("Auto-ensuring admin role failed on mount:", err);
+      });
+    }
+  }, [isAuthorized, currentUser]);
+
   // 1. Fetch all users for Admin
   useEffect(() => {
     if (!isAuthorized) return;
