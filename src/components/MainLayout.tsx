@@ -54,6 +54,7 @@ export default function MainLayout() {
       <div className={`flex-1 min-w-0 h-full ${!isSidebarOpen ? 'block' : 'hidden md:block'}`}>
         {activeChat ? (
           <ChatArea 
+            key={activeChat.id}
             chat={activeChat} 
             onBack={() => setIsSidebarOpen(true)}
           />

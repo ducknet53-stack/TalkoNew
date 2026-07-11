@@ -16,6 +16,7 @@ import { uploadImage } from '../lib/imgbb';
 import toast from 'react-hot-toast';
 
 interface ChatAreaProps {
+  key?: string;
   chat: Chat;
   onBack: () => void;
 }
@@ -32,10 +33,12 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTypingTimeRef = useRef<number>(0);
+  const lastMyTypingWriteRef = useRef<number>(0);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevMessagesLengthRef = useRef(0);
 
   const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
@@ -82,6 +85,13 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     }
   };
 
+  const forceScrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    scrollToBottom(behavior);
+    setTimeout(() => scrollToBottom(behavior), 30);
+    setTimeout(() => scrollToBottom(behavior), 100);
+    setTimeout(() => scrollToBottom(behavior), 250);
+  };
+
   useEffect(() => {
     if (messages.length === 0) return;
 
@@ -94,17 +104,18 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     if (isInitialLoad) {
       // Unconditional instant scroll to bottom on initial load
       setTimeout(() => scrollToBottom('auto'), 50);
+      setTimeout(() => scrollToBottom('auto'), 150);
     } else if (isNewMessage) {
       const lastMessage = messages[messages.length - 1];
       const isMyMessage = lastMessage.senderId === currentUser?.uid;
 
       if (isMyMessage) {
-        setTimeout(() => scrollToBottom('smooth'), 50);
+        forceScrollToBottom('smooth');
       } else {
-        // Only scroll if already near bottom (threshold 150px)
-        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+        // Only scroll if already near bottom (threshold 200px)
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
         if (isNearBottom) {
-          setTimeout(() => scrollToBottom('smooth'), 50);
+          forceScrollToBottom('smooth');
         }
       }
     }
@@ -116,7 +127,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     if (isOtherUserTyping) {
       const container = scrollContainerRef.current;
       if (container) {
-        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
         if (isNearBottom) {
           scrollToBottom('smooth');
         }
@@ -146,7 +157,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     const handleResize = () => {
       const container = scrollContainerRef.current;
       if (container) {
-        scrollToBottom('smooth');
+        forceScrollToBottom('smooth');
       }
     };
 
@@ -155,6 +166,16 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
       window.visualViewport?.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  // Dynamic textarea height adjustment to match native WhatsApp/Telegram input behavior
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const calculatedHeight = Math.min(Math.max(textarea.scrollHeight, 48), 128);
+      textarea.style.height = `${calculatedHeight}px`;
+    }
+  }, [inputText]);
 
   useEffect(() => {
     if (isSystemChat || !otherUserId || !currentUser) return;
@@ -242,16 +263,23 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     if (!currentVal.trim()) {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setDoc(typingRef, { isTyping: false, timestamp: Date.now() }).catch(() => {});
+      lastMyTypingWriteRef.current = 0;
       return;
     }
 
-    setDoc(typingRef, { isTyping: true, timestamp: Date.now() }).catch(() => {});
+    const now = Date.now();
+    // Throttle the Firestore isTyping: true writes to once every 3.5 seconds to prevent rate-limiting or out-of-order execution
+    if (now - lastMyTypingWriteRef.current > 3500) {
+      setDoc(typingRef, { isTyping: true, timestamp: now }).catch(() => {});
+      lastMyTypingWriteRef.current = now;
+    }
     
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     
     typingTimeoutRef.current = setTimeout(() => {
       setDoc(typingRef, { isTyping: false, timestamp: Date.now() }).catch(() => {});
-    }, 2000);
+      lastMyTypingWriteRef.current = 0;
+    }, 2500);
   };
 
   const handleSendMessage = async (text: string, imageUrl: string | null = null) => {
@@ -266,11 +294,15 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     // Immediately clear input and reset emoji picker for a fast native-like response
     if (!imageUrl) {
       setInputText('');
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
     }
     setShowEmojiPicker(false);
 
     // Immediately clear local and firestore typing status
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    lastMyTypingWriteRef.current = 0;
     const typingRef = doc(db, `chats/${chat.id}/typing`, currentUser.uid);
     setDoc(typingRef, { isTyping: false, timestamp: Date.now() }).catch(err => {
       console.error("Error clearing typing status on send:", err);
@@ -493,9 +525,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             <button
               type="button"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="p-2.5 sm:p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0"
+              className="p-2 sm:p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0"
             >
-              <Smile size={22} className="sm:w-6 sm:h-6" />
+              <Smile size={20} className="sm:w-6 sm:h-6" />
             </button>
             
             <input
@@ -509,12 +541,13 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="p-2.5 sm:p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0 disabled:opacity-50"
+              className="p-2 sm:p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0 disabled:opacity-50"
             >
-              {isUploading ? <Loader2 size={22} className="animate-spin sm:w-6 sm:h-6" /> : <ImageIcon size={22} className="sm:w-6 sm:h-6" />}
+              {isUploading ? <Loader2 size={20} className="animate-spin sm:w-6 sm:h-6" /> : <ImageIcon size={20} className="sm:w-6 sm:h-6" />}
             </button>
             
             <textarea
+              ref={textareaRef}
               value={inputText}
               onChange={(e) => {
                 const val = e.target.value;
@@ -523,8 +556,8 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               }}
               onFocus={() => {
                 setTimeout(() => {
-                  scrollToBottom('smooth');
-                }, 300);
+                  forceScrollToBottom('smooth');
+                }, 150);
               }}
               placeholder="Mesajınızı yazın..."
               className="flex-1 max-h-32 min-h-[48px] bg-gray-100 dark:bg-gray-800 border-transparent rounded-2xl px-4 py-3 focus:bg-white dark:focus:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none overflow-y-auto dark:text-white"
@@ -540,9 +573,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             <button
               type="submit"
               disabled={!inputText.trim() || isUploading}
-              className="p-2.5 sm:p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:bg-gray-300 dark:disabled:bg-gray-700"
+              className="p-2 sm:p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:bg-gray-300 dark:disabled:bg-gray-700"
             >
-              <Send size={18} className="sm:w-5 sm:h-5 ml-0.5 sm:ml-1" />
+              <Send size={16} className="sm:w-5 sm:h-5 ml-0.5 sm:ml-1" />
             </button>
           </form>
         </div>
