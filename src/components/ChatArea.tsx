@@ -1,0 +1,372 @@
+import { useState, useEffect, useRef } from 'react';
+import type { ChangeEvent } from 'react';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { ArrowLeft, Send, Image as ImageIcon, Smile, ShieldCheck, User as UserIcon, Loader2 } from 'lucide-react';
+import EmojiPicker from 'emoji-picker-react';
+import { db } from '../lib/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { Chat, Message } from '../types';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
+import { SYSTEM_USER_ID } from '../lib/systemAccount';
+import { TALKO_LOGO_DATA_URL } from '../lib/assets';
+import { cn } from '../lib/utils';
+import { uploadImage } from '../lib/imgbb';
+import toast from 'react-hot-toast';
+
+interface ChatAreaProps {
+  chat: Chat;
+  onBack: () => void;
+}
+
+export default function ChatArea({ chat, onBack }: ChatAreaProps) {
+  const { currentUser } = useAuth();
+  const { theme } = useTheme();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [otherUserOnline, setOtherUserOnline] = useState(false);
+  const [otherUserLastSeen, setOtherUserLastSeen] = useState<number | null>(null);
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
+  const isSystemChat = otherUserId === SYSTEM_USER_ID;
+  const otherUserDetails = chat.participantDetails[otherUserId || ''];
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const messagesRef = collection(db, `chats/${chat.id}/messages`);
+    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+
+    const unsubscribeMessages = onSnapshot(q, (snapshot) => {
+      const fetchedMessages = snapshot.docs.map(doc => doc.data() as Message);
+      
+      let uniqueMessages = fetchedMessages;
+      if (isSystemChat) {
+        const seenTexts = new Set<string>();
+        uniqueMessages = fetchedMessages.filter(msg => {
+          if (!msg.text) return true;
+          const normalized = msg.text.trim();
+          if (normalized.startsWith("Merhaba") && normalized.includes("Talko'ya hoş geldin")) {
+            if (seenTexts.has(normalized)) {
+              return false;
+            }
+            seenTexts.add(normalized);
+          }
+          return true;
+        });
+      }
+
+      setMessages(uniqueMessages);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    });
+
+    return () => unsubscribeMessages();
+  }, [chat.id, currentUser]);
+
+  useEffect(() => {
+    if (isSystemChat || !otherUserId || !currentUser) return;
+
+    // Listen to other user's online status
+    const userRef = doc(db, 'users', otherUserId);
+    const unsubscribeUser = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setOtherUserOnline(data.isOnline || data.online || false);
+        
+        let lastSeenMs: number | null = null;
+        if (data.lastSeen) {
+          if (typeof data.lastSeen === 'object' && 'toMillis' in data.lastSeen) {
+            lastSeenMs = data.lastSeen.toMillis();
+          } else if (typeof data.lastSeen === 'number') {
+            lastSeenMs = data.lastSeen;
+          } else if (data.lastSeen instanceof Date) {
+            lastSeenMs = data.lastSeen.getTime();
+          }
+        }
+        setOtherUserLastSeen(lastSeenMs);
+      }
+    });
+
+    // Listen to other user's typing status
+    const typingRef = doc(db, `chats/${chat.id}/typing`, otherUserId);
+    const unsubscribeTyping = onSnapshot(typingRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setIsOtherUserTyping(docSnap.data().isTyping || false);
+      } else {
+        setIsOtherUserTyping(false);
+      }
+    });
+
+    return () => {
+      unsubscribeUser();
+      unsubscribeTyping();
+    };
+  }, [otherUserId, isSystemChat, chat.id, currentUser]);
+
+  const handleTyping = () => {
+    if (!currentUser || isSystemChat) return;
+    
+    const typingRef = doc(db, `chats/${chat.id}/typing`, currentUser.uid);
+    setDoc(typingRef, { isTyping: true, timestamp: Date.now() });
+    
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    
+    typingTimeoutRef.current = setTimeout(() => {
+      setDoc(typingRef, { isTyping: false, timestamp: Date.now() });
+    }, 2000);
+  };
+
+  const handleSendMessage = async (text: string, imageUrl: string | null = null) => {
+    if ((!text.trim() && !imageUrl) || !currentUser) return;
+    
+    if (isSystemChat) {
+      toast.error("Talko Destek hesabına yanıt gönderilemez.");
+      return;
+    }
+
+    const now = Date.now();
+    const messageId = now.toString() + Math.random().toString(36).substring(2, 5);
+    
+    try {
+      const messageRef = doc(db, `chats/${chat.id}/messages`, messageId);
+      await setDoc(messageRef, {
+        id: messageId,
+        senderId: currentUser.uid,
+        text: text.trim() || null,
+        imageUrl,
+        timestamp: now
+      });
+
+      const chatRef = doc(db, 'chats', chat.id);
+      await updateDoc(chatRef, {
+        lastMessage: text.trim() || (imageUrl ? '📷 Görsel' : ''),
+        lastMessageTimestamp: now,
+        updatedAt: now
+      });
+
+      setInputText('');
+      setShowEmojiPicker(false);
+      
+      // Clear typing status
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      const typingRef = doc(db, `chats/${chat.id}/typing`, currentUser.uid);
+      setDoc(typingRef, { isTyping: false, timestamp: Date.now() });
+      
+    } catch (err) {
+      console.error(err);
+      toast.error("Mesaj gönderilemedi.");
+    }
+  };
+
+  const onEmojiClick = (emojiObject: any) => {
+    setInputText(prev => prev + emojiObject.emoji);
+    handleTyping();
+  };
+
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Lütfen geçerli bir görsel seçin.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const url = await uploadImage(file);
+      if (url) {
+        await handleSendMessage('', url);
+      }
+    } catch (err: any) {
+      toast.error('Görsel yüklenirken hata: ' + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-gray-900 relative transition-colors">
+      <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shadow-sm z-10">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={onBack}
+            className="md:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          
+          <div className="relative w-10 h-10 flex-shrink-0">
+            <div className="w-full h-full rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
+              {isSystemChat ? (
+                <img src={TALKO_LOGO_DATA_URL} alt="Talko Destek" className="w-full h-full object-cover" />
+              ) : otherUserDetails?.photoURL ? (
+                <img src={otherUserDetails.photoURL} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30">
+                  <UserIcon size={20} />
+                </div>
+              )}
+            </div>
+            {otherUserOnline && !isSystemChat && (
+              <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900 shadow-sm z-10" />
+            )}
+          </div>
+          
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-semibold text-gray-900 dark:text-white leading-tight">
+                {otherUserDetails?.username}
+              </h2>
+              {isSystemChat && <ShieldCheck size={16} className="text-blue-600 dark:text-blue-400" />}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {isSystemChat ? 'Resmi Sistem Hesabı' : 
+               isOtherUserTyping ? <span className="text-blue-500 dark:text-blue-400 italic">yazıyor...</span> :
+               otherUserOnline ? <span className="text-blue-600 dark:text-blue-400 font-medium">Çevrimiçi</span> : 
+               otherUserLastSeen ? `Son görülme: ${format(otherUserLastSeen, 'HH:mm', { locale: tr })}` : 'Çevrimdışı'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {messages.map((msg, idx) => {
+          const isMine = msg.senderId === currentUser?.uid;
+          const showAvatar = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
+          
+          return (
+            <div key={msg.id} className={cn("flex", isMine ? "justify-end" : "justify-start", !showAvatar && !isMine && "ml-10")}>
+              {!isMine && showAvatar && (
+                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mr-2 mt-auto bg-gray-100 dark:bg-gray-800">
+                   {isSystemChat ? (
+                     <img src={TALKO_LOGO_DATA_URL} alt="Talko Destek" className="w-full h-full object-cover" />
+                   ) : otherUserDetails?.photoURL ? (
+                     <img src={otherUserDetails.photoURL} alt="" className="w-full h-full object-cover" />
+                   ) : (
+                     <div className="w-full h-full flex items-center justify-center text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 text-xs">
+                       <UserIcon size={14} />
+                     </div>
+                   )}
+                </div>
+              )}
+              
+              <div className={cn(
+                "max-w-[75%] md:max-w-[65%] rounded-2xl px-4 py-2.5 shadow-sm relative group",
+                isMine ? "bg-blue-600 text-white rounded-br-sm" : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-100 dark:border-gray-700 rounded-bl-sm"
+              )}>
+                {msg.imageUrl && (
+                  <img src={msg.imageUrl} alt="Shared" className="max-w-full rounded-xl mb-2 object-cover max-h-64 cursor-pointer hover:opacity-95 transition-opacity" />
+                )}
+                {msg.text && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.text}</p>}
+                
+                <span className={cn(
+                  "text-[10px] mt-1 block",
+                  isMine ? "text-blue-200 text-right" : "text-gray-400 dark:text-gray-500 text-right"
+                )}>
+                  {format(msg.timestamp, 'HH:mm')}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+        {isOtherUserTyping && (
+          <div className="flex justify-start ml-10">
+            <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"></span>
+              <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+              <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {isSystemChat ? (
+        <div className="p-4 bg-gray-50 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800 flex items-center justify-center">
+          <div className="max-w-md w-full bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl p-4 flex gap-3 shadow-sm">
+            <span className="text-xl select-none" role="img" aria-label="lock">🔒</span>
+            <div className="text-left">
+              <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-0.5">
+                Talko Destek
+              </h4>
+              <p className="text-xs text-blue-800/85 dark:text-blue-400/85 leading-relaxed">
+                Bu doğrulanmış Talko Destek hesabıdır. Bu sohbet yalnızca resmî duyurular ve sistem bilgilendirmeleri için kullanılır. Bu hesaba mesaj gönderilemez.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+          <form 
+            onSubmit={(e) => { e.preventDefault(); handleSendMessage(inputText); }}
+            className="flex items-end gap-2 relative"
+          >
+            {showEmojiPicker && (
+              <div className="absolute bottom-full left-0 mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800">
+                <EmojiPicker onEmojiClick={onEmojiClick} autoFocusSearch={false} theme={theme} />
+              </div>
+            )}
+            
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0"
+            >
+              <Smile size={24} />
+            </button>
+            
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/*"
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0 disabled:opacity-50"
+            >
+              {isUploading ? <Loader2 size={24} className="animate-spin" /> : <ImageIcon size={24} />}
+            </button>
+            
+            <textarea
+              value={inputText}
+              onChange={(e) => {
+                setInputText(e.target.value);
+                handleTyping();
+              }}
+              placeholder="Mesajınızı yazın..."
+              className="flex-1 max-h-32 min-h-[48px] bg-gray-100 dark:bg-gray-800 border-transparent rounded-2xl px-4 py-3 focus:bg-white dark:focus:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none overflow-y-auto dark:text-white"
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage(inputText);
+                }
+              }}
+            />
+            
+            <button
+              type="submit"
+              disabled={!inputText.trim() || isUploading}
+              className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:bg-gray-300 dark:disabled:bg-gray-700"
+            >
+              <Send size={20} className="ml-1" />
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
