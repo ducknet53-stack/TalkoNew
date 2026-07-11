@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { ArrowLeft, Send, Image as ImageIcon, Smile, ShieldCheck, User as UserIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Image as ImageIcon, Smile, BadgeCheck, User as UserIcon, Loader2 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -399,7 +399,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               <h2 className="font-semibold text-gray-900 dark:text-white leading-tight">
                 {otherUserDetails?.username}
               </h2>
-              {isSystemChat && <ShieldCheck size={16} className="text-blue-600 dark:text-blue-400" />}
+              {isSystemChat && <BadgeCheck size={18} className="text-blue-500 fill-blue-500/10 dark:text-blue-400 dark:fill-blue-400/10" />}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {isSystemChat ? 'Resmi Sistem Hesabı' : 

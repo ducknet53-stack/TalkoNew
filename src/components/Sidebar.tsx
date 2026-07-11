@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, getDocs, setDoc, doc, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { LogOut, User as UserIcon, Search, MessageSquarePlus, ShieldCheck, Moon, Sun } from 'lucide-react';
+import { LogOut, User as UserIcon, Search, MessageSquarePlus, BadgeCheck, Moon, Sun } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -204,7 +204,7 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
           <div className="flex items-center justify-between mb-0.5">
             <div className="flex items-center gap-1.5">
               <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{otherUser?.username}</p>
-              {isSystem && <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400 flex-shrink-0" />}
+              {isSystem && <BadgeCheck size={16} className="text-blue-500 fill-blue-500/10 dark:text-blue-400 dark:fill-blue-400/10 flex-shrink-0" />}
             </div>
             <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap ml-2">
               {timeString.replace('yaklaşık ', '')}
