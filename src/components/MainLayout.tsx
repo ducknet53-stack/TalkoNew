@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import ChatArea from './ChatArea';
 import ProfileModal from './ProfileModal';
@@ -8,6 +8,27 @@ export default function MainLayout() {
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [viewportHeight, setViewportHeight] = useState('100dvh');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      if (window.visualViewport) {
+        setViewportHeight(`${window.visualViewport.height}px`);
+      }
+    };
+
+    window.visualViewport?.addEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('scroll', handleResize);
+    
+    handleResize();
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
+  }, []);
 
   const handleChatSelect = (chat: Chat) => {
     setActiveChat(chat);
@@ -18,7 +39,10 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-gray-900 overflow-hidden transition-colors">
+    <div 
+      style={{ height: viewportHeight }}
+      className="flex bg-white dark:bg-gray-900 overflow-hidden transition-colors w-full"
+    >
       <div className={`md:w-80 lg:w-96 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 h-full ${isSidebarOpen ? 'block' : 'hidden md:block'}`}>
         <Sidebar 
           onChatSelect={handleChatSelect} 

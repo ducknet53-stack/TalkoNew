@@ -34,6 +34,8 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevMessagesLengthRef = useRef(0);
 
   const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
   const isSystemChat = otherUserId === SYSTEM_USER_ID;
@@ -65,11 +67,61 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
       }
 
       setMessages(uniqueMessages);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     });
 
     return () => unsubscribeMessages();
   }, [chat.id, currentUser]);
+
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const isInitialLoad = prevMessagesLengthRef.current === 0;
+    const isNewMessage = messages.length > prevMessagesLengthRef.current;
+
+    if (isInitialLoad) {
+      // Unconditional instant scroll to bottom on initial load
+      scrollToBottom('auto');
+    } else if (isNewMessage) {
+      const lastMessage = messages[messages.length - 1];
+      const isMyMessage = lastMessage.senderId === currentUser?.uid;
+
+      if (isMyMessage) {
+        scrollToBottom('smooth');
+      } else {
+        // Only scroll if already near bottom (threshold 150px)
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+        if (isNearBottom) {
+          scrollToBottom('smooth');
+        }
+      }
+    }
+
+    prevMessagesLengthRef.current = messages.length;
+  }, [messages, currentUser]);
+
+  useEffect(() => {
+    if (isOtherUserTyping) {
+      const container = scrollContainerRef.current;
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+        if (isNearBottom) {
+          scrollToBottom('smooth');
+        }
+      }
+    }
+  }, [isOtherUserTyping]);
 
   useEffect(() => {
     if (isSystemChat || !otherUserId || !currentUser) return;
@@ -238,7 +290,10 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-6"
+      >
         {messages.map((msg, idx) => {
           const isMine = msg.senderId === currentUser?.uid;
           const showAvatar = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
@@ -260,13 +315,13 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               )}
               
               <div className={cn(
-                "max-w-[75%] md:max-w-[65%] rounded-2xl px-4 py-2.5 shadow-sm relative group",
+                "max-w-[75%] md:max-w-[65%] min-w-0 rounded-2xl px-4 py-2.5 shadow-sm relative group break-words [overflow-wrap:anywhere] [word-break:break-word]",
                 isMine ? "bg-blue-600 text-white rounded-br-sm" : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-100 dark:border-gray-700 rounded-bl-sm"
               )}>
                 {msg.imageUrl && (
                   <img src={msg.imageUrl} alt="Shared" className="max-w-full rounded-xl mb-2 object-cover max-h-64 cursor-pointer hover:opacity-95 transition-opacity" />
                 )}
-                {msg.text && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.text}</p>}
+                {msg.text && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] text-[15px] leading-relaxed">{msg.text}</p>}
                 
                 <span className={cn(
                   "text-[10px] mt-1 block",
@@ -319,9 +374,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             <button
               type="button"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0"
+              className="p-2.5 sm:p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0"
             >
-              <Smile size={24} />
+              <Smile size={22} className="sm:w-6 sm:h-6" />
             </button>
             
             <input
@@ -335,9 +390,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0 disabled:opacity-50"
+              className="p-2.5 sm:p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors flex-shrink-0 disabled:opacity-50"
             >
-              {isUploading ? <Loader2 size={24} className="animate-spin" /> : <ImageIcon size={24} />}
+              {isUploading ? <Loader2 size={22} className="animate-spin sm:w-6 sm:h-6" /> : <ImageIcon size={22} className="sm:w-6 sm:h-6" />}
             </button>
             
             <textarea
@@ -345,6 +400,11 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               onChange={(e) => {
                 setInputText(e.target.value);
                 handleTyping();
+              }}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollToBottom('smooth');
+                }, 300);
               }}
               placeholder="Mesajınızı yazın..."
               className="flex-1 max-h-32 min-h-[48px] bg-gray-100 dark:bg-gray-800 border-transparent rounded-2xl px-4 py-3 focus:bg-white dark:focus:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none overflow-y-auto dark:text-white"
@@ -360,9 +420,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             <button
               type="submit"
               disabled={!inputText.trim() || isUploading}
-              className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:bg-gray-300 dark:disabled:bg-gray-700"
+              className="p-2.5 sm:p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:bg-gray-300 dark:disabled:bg-gray-700"
             >
-              <Send size={20} className="ml-1" />
+              <Send size={18} className="sm:w-5 sm:h-5 ml-0.5 sm:ml-1" />
             </button>
           </form>
         </div>
