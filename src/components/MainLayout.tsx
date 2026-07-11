@@ -43,7 +43,7 @@ export default function MainLayout() {
       style={{ height: viewportHeight }}
       className="flex bg-white dark:bg-gray-900 overflow-hidden transition-colors w-full"
     >
-      <div className={`md:w-80 lg:w-96 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 h-full ${isSidebarOpen ? 'block' : 'hidden md:block'}`}>
+      <div className={`w-full md:w-80 lg:w-96 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 h-full ${isSidebarOpen ? 'block' : 'hidden md:block'}`}>
         <Sidebar 
           onChatSelect={handleChatSelect} 
           activeChatId={activeChat?.id} 

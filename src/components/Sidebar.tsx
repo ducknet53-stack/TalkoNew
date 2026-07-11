@@ -178,7 +178,7 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
         key={chat.id}
         onClick={() => onChatSelect(chat)}
         className={cn(
-          "w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-left",
+          "w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-left min-w-0",
           activeChatId === chat.id 
             ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-medium" 
             : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
@@ -201,17 +201,17 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-0.5">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between mb-0.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{otherUser?.username}</p>
               {isSystem && <BadgeCheck size={16} className="text-blue-500 fill-blue-500/10 dark:text-blue-400 dark:fill-blue-400/10 flex-shrink-0" />}
             </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap ml-2">
+            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap ml-2 flex-shrink-0">
               {timeString.replace('yaklaşık ', '')}
             </span>
           </div>
           <p className={cn(
-            "text-sm truncate",
+            "text-sm truncate w-full",
             activeChatId === chat.id ? "text-blue-600 dark:text-blue-400 font-medium" : "text-gray-500 dark:text-gray-400"
           )}>
             {chat.lastMessage || 'Sohbete başla'}
@@ -226,7 +226,7 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
       <button
         key={user.uid}
         onClick={() => startChat(user)}
-        className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 rounded-xl transition-all duration-200 text-left"
+        className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 rounded-xl transition-all duration-200 text-left min-w-0"
       >
         <div className="relative w-10 h-10 flex-shrink-0">
           <div className="w-full h-full rounded-full overflow-hidden bg-gray-100 dark:bg-gray-850">
@@ -243,8 +243,8 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{user.username}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.about || 'Merhaba!'}</p>
+          <p className="font-semibold text-gray-900 dark:text-gray-100 truncate w-full">{user.username}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 truncate w-full">{user.about || 'Merhaba!'}</p>
         </div>
         <MessageSquarePlus size={18} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-2" />
       </button>
@@ -254,8 +254,8 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 transition-colors">
       {/* Header */}
-      <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <button onClick={onOpenProfile} className="relative group focus:outline-none flex-shrink-0">
             <div className="relative w-10 h-10">
               <div className="w-full h-full rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
@@ -273,12 +273,12 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
               <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900 shadow-sm z-20" />
             </div>
           </button>
-          <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white leading-tight">{userProfile?.username || 'Yükleniyor...'}</h2>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-gray-900 dark:text-white leading-tight truncate">{userProfile?.username || 'Yükleniyor...'}</h2>
             <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Çevrimiçi</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
           <button onClick={toggleTheme} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded-full hover:bg-gray-50 dark:hover:bg-gray-800">
             {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
           </button>

@@ -368,11 +368,11 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-gray-900 relative transition-colors">
-      <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center gap-3">
+      <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shadow-sm z-10 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <button 
             onClick={onBack}
-            className="md:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+            className="md:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0"
           >
             <ArrowLeft size={20} />
           </button>
@@ -394,14 +394,14 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             )}
           </div>
           
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h2 className="font-semibold text-gray-900 dark:text-white leading-tight">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h2 className="font-semibold text-gray-900 dark:text-white leading-tight truncate">
                 {otherUserDetails?.username}
               </h2>
-              {isSystemChat && <BadgeCheck size={18} className="text-blue-500 fill-blue-500/10 dark:text-blue-400 dark:fill-blue-400/10" />}
+              {isSystemChat && <BadgeCheck size={18} className="text-blue-500 fill-blue-500/10 dark:text-blue-400 dark:fill-blue-400/10 flex-shrink-0" />}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {isSystemChat ? 'Resmi Sistem Hesabı' : 
                isOtherUserTyping ? <span className="text-blue-500 dark:text-blue-400 italic">yazıyor...</span> :
                otherUserOnline ? <span className="text-blue-600 dark:text-blue-400 font-medium">Çevrimiçi</span> : 
@@ -514,10 +514,10 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
         <div className="p-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
           <form 
             onSubmit={(e) => { e.preventDefault(); handleSendMessage(inputText); }}
-            className="flex items-end gap-2 relative"
+            className="flex items-end gap-2 relative w-full min-w-0"
           >
             {showEmojiPicker && (
-              <div className="absolute bottom-full left-0 mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800">
+              <div className="absolute bottom-full left-0 mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 max-w-full">
                 <EmojiPicker onEmojiClick={onEmojiClick} autoFocusSearch={false} theme={theme} />
               </div>
             )}
@@ -560,7 +560,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
                 }, 150);
               }}
               placeholder="Mesajınızı yazın..."
-              className="flex-1 max-h-32 min-h-[48px] bg-gray-100 dark:bg-gray-800 border-transparent rounded-2xl px-4 py-3 focus:bg-white dark:focus:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none overflow-y-auto dark:text-white"
+              className="flex-1 max-h-32 min-h-[48px] bg-gray-100 dark:bg-gray-800 border-transparent rounded-2xl px-4 py-3 focus:bg-white dark:focus:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none overflow-y-auto dark:text-white min-w-0"
               rows={1}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
