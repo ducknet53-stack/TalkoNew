@@ -31,6 +31,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<number | null>(null);
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTypingTimeRef = useRef<number>(0);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,18 +93,18 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
 
     if (isInitialLoad) {
       // Unconditional instant scroll to bottom on initial load
-      scrollToBottom('auto');
+      setTimeout(() => scrollToBottom('auto'), 50);
     } else if (isNewMessage) {
       const lastMessage = messages[messages.length - 1];
       const isMyMessage = lastMessage.senderId === currentUser?.uid;
 
       if (isMyMessage) {
-        scrollToBottom('smooth');
+        setTimeout(() => scrollToBottom('smooth'), 50);
       } else {
         // Only scroll if already near bottom (threshold 150px)
         const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
         if (isNearBottom) {
-          scrollToBottom('smooth');
+          setTimeout(() => scrollToBottom('smooth'), 50);
         }
       }
     }
@@ -183,28 +184,73 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     const typingRef = doc(db, `chats/${chat.id}/typing`, otherUserId);
     const unsubscribeTyping = onSnapshot(typingRef, (docSnap) => {
       if (docSnap.exists()) {
-        setIsOtherUserTyping(docSnap.data().isTyping || false);
+        const data = docSnap.data();
+        const isTyping = data.isTyping || false;
+        const timestamp = data.timestamp || 0;
+        lastTypingTimeRef.current = timestamp;
+
+        if (isTyping) {
+          if (Date.now() - timestamp < 5000) {
+            setIsOtherUserTyping(true);
+          } else {
+            setIsOtherUserTyping(false);
+          }
+        } else {
+          setIsOtherUserTyping(false);
+        }
       } else {
         setIsOtherUserTyping(false);
       }
     });
 
+    // Periodically decay/expire typing indicator if sender's connection drops
+    const interval = setInterval(() => {
+      if (lastTypingTimeRef.current && Date.now() - lastTypingTimeRef.current >= 5000) {
+        setIsOtherUserTyping(false);
+      }
+    }, 1000);
+
     return () => {
       unsubscribeUser();
       unsubscribeTyping();
+      clearInterval(interval);
     };
   }, [otherUserId, isSystemChat, chat.id, currentUser]);
 
-  const handleTyping = () => {
+  // Handle visibility changes or closing tabs to immediately clear typing
+  useEffect(() => {
+    const handleVisibilityOrUnload = () => {
+      if (document.visibilityState === 'hidden' && currentUser && chat.id && !isSystemChat) {
+        const typingRef = doc(db, `chats/${chat.id}/typing`, currentUser.uid);
+        setDoc(typingRef, { isTyping: false, timestamp: Date.now() }).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrUnload);
+    window.addEventListener('beforeunload', handleVisibilityOrUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrUnload);
+      window.removeEventListener('beforeunload', handleVisibilityOrUnload);
+    };
+  }, [chat.id, currentUser, isSystemChat]);
+
+  const handleTyping = (textValue?: string) => {
     if (!currentUser || isSystemChat) return;
     
     const typingRef = doc(db, `chats/${chat.id}/typing`, currentUser.uid);
-    setDoc(typingRef, { isTyping: true, timestamp: Date.now() });
+    const currentVal = textValue !== undefined ? textValue : inputText;
+
+    if (!currentVal.trim()) {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      setDoc(typingRef, { isTyping: false, timestamp: Date.now() }).catch(() => {});
+      return;
+    }
+
+    setDoc(typingRef, { isTyping: true, timestamp: Date.now() }).catch(() => {});
     
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     
     typingTimeoutRef.current = setTimeout(() => {
-      setDoc(typingRef, { isTyping: false, timestamp: Date.now() });
+      setDoc(typingRef, { isTyping: false, timestamp: Date.now() }).catch(() => {});
     }, 2000);
   };
 
@@ -261,8 +307,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
   };
 
   const onEmojiClick = (emojiObject: any) => {
-    setInputText(prev => prev + emojiObject.emoji);
-    handleTyping();
+    const newVal = inputText + emojiObject.emoji;
+    setInputText(newVal);
+    handleTyping(newVal);
   };
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -334,14 +381,21 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-6"
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6"
       >
         {messages.map((msg, idx) => {
           const isMine = msg.senderId === currentUser?.uid;
           const showAvatar = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
           
           return (
-            <div key={msg.id} className={cn("flex", isMine ? "justify-end" : "justify-start", !showAvatar && !isMine && "ml-10")}>
+            <div 
+              key={msg.id} 
+              className={cn(
+                "flex w-full min-w-0 px-0.5", 
+                isMine ? "justify-end" : "justify-start", 
+                !showAvatar && !isMine && "pl-10"
+              )}
+            >
               {!isMine && showAvatar && (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mr-2 mt-auto bg-gray-100 dark:bg-gray-800">
                    {isSystemChat ? (
@@ -399,7 +453,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
           );
         })}
         {isOtherUserTyping && (
-          <div className="flex justify-start ml-10">
+          <div className="flex justify-start pl-10 w-full">
             <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"></span>
               <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
@@ -463,8 +517,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             <textarea
               value={inputText}
               onChange={(e) => {
-                setInputText(e.target.value);
-                handleTyping();
+                const val = e.target.value;
+                setInputText(val);
+                handleTyping(val);
               }}
               onFocus={() => {
                 setTimeout(() => {
