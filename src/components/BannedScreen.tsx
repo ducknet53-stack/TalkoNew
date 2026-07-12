@@ -25,12 +25,19 @@ export default function BannedScreen() {
           Hesabınız Askıya Alındı
         </h1>
         
-        <p className="text-slate-400 text-sm leading-relaxed mb-8">
+        <p className="text-slate-400 text-sm leading-relaxed mb-6">
           Talko topluluk kurallarına aykırı davranışlar tespit edildiği veya güvenlik ihlali gerekçesiyle bu hesaba erişim kalıcı olarak askıya alınmıştır. 
           <span className="block mt-3 font-semibold text-slate-300">
             Eğer bir hata olduğunu düşünüyorsanız, lütfen yönetimle iletişime geçin.
           </span>
         </p>
+
+        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-4 mb-8 text-xs text-slate-400 flex flex-col items-center justify-center gap-1">
+          <span className="text-slate-300 font-medium">📧 İtiraz için:</span>
+          <a href="mailto:talko.helpdesk@outlook.com" className="text-red-400 hover:text-red-300 transition-colors font-semibold select-all">
+            talko.helpdesk@outlook.com
+          </a>
+        </div>
 
         <button
           onClick={handleLogout}
