@@ -144,9 +144,12 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
   // Instant local filtering
   const filteredChats = chats.filter(chat => {
     const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
-    const otherUser = chat.participantDetails[otherUserId || ''];
-    const otherUserObj = allUsers.find(u => u.uid === otherUserId);
-    if (otherUserObj?.isBanned) return false;
+    const isSystem = otherUserId === SYSTEM_USER_ID;
+    const userObj = otherUserId === currentUser?.uid ? userProfile : allUsers.find(u => u.uid === otherUserId);
+    if (userObj?.isBanned) return false;
+    const otherUser = isSystem 
+      ? { username: 'Talko Destek' }
+      : (userObj || chat.participantDetails[otherUserId || ''] || {});
     return otherUser?.username?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
@@ -161,11 +164,13 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
     const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
     if (!otherUserId) return null;
     
-    const otherUser = chat.participantDetails[otherUserId];
     const isSystem = otherUserId === SYSTEM_USER_ID;
     
-    // Get latest user object for status
-    const userObj = allUsers.find(u => u.uid === otherUserId);
+    // Get latest user object for status and profile photo/username sync
+    const userObj = otherUserId === currentUser?.uid ? userProfile : allUsers.find(u => u.uid === otherUserId);
+    const otherUser = isSystem 
+      ? { username: 'Talko Destek', photoURL: TALKO_LOGO_DATA_URL }
+      : (userObj || chat.participantDetails[otherUserId] || {});
     const isOnline = userObj ? (userObj.isOnline || (userObj as any).online) : false;
     
     let timeString = '';

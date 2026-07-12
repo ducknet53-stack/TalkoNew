@@ -22,7 +22,7 @@ interface ChatAreaProps {
 }
 
 export default function ChatArea({ chat, onBack }: ChatAreaProps) {
-  const { currentUser } = useAuth();
+  const { currentUser, userProfile } = useAuth();
   const { theme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -31,6 +31,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
   const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<number | null>(null);
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+  const [liveOtherUser, setLiveOtherUser] = useState<any>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTypingTimeRef = useRef<number>(0);
   const lastMyTypingWriteRef = useRef<number>(0);
@@ -43,7 +44,11 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
 
   const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
   const isSystemChat = otherUserId === SYSTEM_USER_ID;
-  const otherUserDetails = chat.participantDetails[otherUserId || ''];
+  const otherUserDetails = isSystemChat 
+    ? { username: 'Talko Destek', photoURL: TALKO_LOGO_DATA_URL }
+    : (otherUserId === currentUser?.uid 
+        ? userProfile 
+        : (liveOtherUser || chat.participantDetails[otherUserId || ''] || {}));
 
   useEffect(() => {
     if (!currentUser) return;
@@ -185,6 +190,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
     const unsubscribeUser = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        setLiveOtherUser(data);
         setOtherUserOnline(data.isOnline || data.online || false);
         
         let lastSeenMs: number | null = null;
