@@ -191,19 +191,24 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setLiveOtherUser(data);
-        setOtherUserOnline(data.isOnline || data.online || false);
-        
-        let lastSeenMs: number | null = null;
-        if (data.lastSeen) {
-          if (typeof data.lastSeen === 'object' && 'toMillis' in data.lastSeen) {
-            lastSeenMs = data.lastSeen.toMillis();
-          } else if (typeof data.lastSeen === 'number') {
-            lastSeenMs = data.lastSeen;
-          } else if (data.lastSeen instanceof Date) {
-            lastSeenMs = data.lastSeen.getTime();
+        if (data.isBanned) {
+          setOtherUserOnline(false);
+          setOtherUserLastSeen(null);
+        } else {
+          setOtherUserOnline(data.isOnline || data.online || false);
+          
+          let lastSeenMs: number | null = null;
+          if (data.lastSeen) {
+            if (typeof data.lastSeen === 'object' && 'toMillis' in data.lastSeen) {
+              lastSeenMs = data.lastSeen.toMillis();
+            } else if (typeof data.lastSeen === 'number') {
+              lastSeenMs = data.lastSeen;
+            } else if (data.lastSeen instanceof Date) {
+              lastSeenMs = data.lastSeen.getTime();
+            }
           }
+          setOtherUserLastSeen(lastSeenMs);
         }
-        setOtherUserLastSeen(lastSeenMs);
       }
     });
 
@@ -409,6 +414,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {isSystemChat ? 'Resmi Sistem Hesabı' : 
+               otherUserDetails?.isBanned ? 'Çevrimdışı' :
                isOtherUserTyping ? <span className="text-blue-500 dark:text-blue-400 italic">yazıyor...</span> :
                otherUserOnline ? <span className="text-blue-600 dark:text-blue-400 font-medium">Çevrimiçi</span> : 
                otherUserLastSeen ? `Son görülme: ${format(otherUserLastSeen, 'HH:mm', { locale: tr })}` : 'Çevrimdışı'}
@@ -512,6 +518,20 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               </h4>
               <p className="text-xs text-blue-800/85 dark:text-blue-400/85 leading-relaxed">
                 Bu doğrulanmış Talko Destek hesabıdır. Bu sohbet yalnızca resmî duyurular ve sistem bilgilendirmeleri için kullanılır. Bu hesaba mesaj gönderilemez.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : otherUserDetails?.isBanned ? (
+        <div className="p-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))] bg-gray-50 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800 flex items-center justify-center">
+          <div className="max-w-md w-full bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-2xl p-4 flex gap-3 shadow-sm">
+            <span className="text-xl select-none" role="img" aria-label="banned">🚫</span>
+            <div className="text-left">
+              <h4 className="text-sm font-semibold text-red-900 dark:text-red-300 mb-0.5">
+                Kullanıcı Askıya Alındı
+              </h4>
+              <p className="text-xs text-red-800/85 dark:text-red-400/85 leading-relaxed">
+                Bu kullanıcı hesabı, topluluk kurallarını ihlal ettiği gerekçesiyle askıya alınmıştır. Bu hesaba mesaj gönderilemez.
               </p>
             </div>
           </div>

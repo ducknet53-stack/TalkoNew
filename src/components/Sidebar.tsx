@@ -141,24 +141,35 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
     await auth.signOut();
   };
 
-  // Instant local filtering
-  const filteredChats = chats.filter(chat => {
+  // Filter out banned users for UI lists in real-time
+  const visibleAllUsers = allUsers.filter(u => !u.isBanned);
+
+  const visibleChats = chats.filter(chat => {
     if (!chat || !chat.participants) return false;
+    const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
+    if (otherUserId === SYSTEM_USER_ID) return true;
+    
+    // Check if the other user is banned in allUsers in real-time
+    const otherUserObj = allUsers.find(u => u.uid === otherUserId);
+    if (otherUserObj?.isBanned) return false;
+    
+    return true;
+  });
+
+  // Instant local filtering
+  const filteredChats = visibleChats.filter(chat => {
     const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
     const isSystem = otherUserId === SYSTEM_USER_ID;
     const userObj = otherUserId === currentUser?.uid ? userProfile : allUsers.find(u => u.uid === otherUserId);
-    if (userObj?.isBanned) return false;
     const otherUser = isSystem 
       ? { username: 'Talko Destek' }
       : (userObj || chat.participantDetails?.[otherUserId || ''] || {});
     return otherUser?.username?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const filteredUsers = allUsers.filter(user => 
-    !user.isBanned && (
-      user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
+  const filteredUsers = visibleAllUsers.filter(user => 
+    user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const renderChatButton = (chat: Chat) => {
@@ -346,11 +357,11 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
         ) : (
           <div className="p-2 space-y-4">
             {/* Active Chats Section */}
-            {chats.length > 0 && (
+            {visibleChats.length > 0 && (
               <div>
                 <h3 className="px-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Sohbetler</h3>
                 <div className="space-y-1">
-                  {chats.map(chat => renderChatButton(chat))}
+                  {visibleChats.map(chat => renderChatButton(chat))}
                 </div>
               </div>
             )}
@@ -358,9 +369,9 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
             {/* All Registered Users Section */}
             <div>
               <h3 className="px-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Kullanıcılar</h3>
-              {allUsers.length > 0 ? (
+              {visibleAllUsers.length > 0 ? (
                 <div className="space-y-1">
-                  {allUsers.map(user => renderUserButton(user))}
+                  {visibleAllUsers.map(user => renderUserButton(user))}
                 </div>
               ) : (
                 <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-4">Kayıtlı kullanıcı bulunmuyor.</p>

@@ -53,7 +53,9 @@ export default function AuthScreen() {
           isOnline: true,
           online: true,
           lastSeen: serverTimestamp(),
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          isBanned: false,
+          bannedAt: null
         });
 
         // Ensure system account exists and send welcome message

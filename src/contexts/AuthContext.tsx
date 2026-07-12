@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, onSnapshot, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const userProfileRef = useRef<User | null>(null);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -56,10 +57,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         unsubscribeProfile = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data() as User;
+            userProfileRef.current = data;
             setUserProfile(data);
             
+            // If user is banned, ensure they are offline and do not check welcome messages
+            if (data.isBanned) {
+              updateDoc(userRef, {
+                isOnline: false,
+                online: false
+              }).catch(() => {});
+              return;
+            }
+
             // Ensure system account and welcome message are set up exactly once per login session
-            if (!welcomeChecked && !data.isBanned) {
+            if (!welcomeChecked) {
               welcomeChecked = true;
               ensureSystemAccount().then(() => {
                 sendWelcomeMessageIfNeeded(user.uid, data.username, data.photoURL);
@@ -68,12 +79,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         });
 
-        // Set online status to true
-        await updateDoc(userRef, {
-          isOnline: true,
-          online: true,
-          lastSeen: serverTimestamp()
-        }).catch(err => console.error("Error setting online status:", err));
+        // Set online status to true on startup only if not banned
+        getDoc(userRef).then((docSnap) => {
+          const isBanned = docSnap.exists() ? docSnap.data()?.isBanned : false;
+          if (!isBanned) {
+            updateDoc(userRef, {
+              isOnline: true,
+              online: true,
+              lastSeen: serverTimestamp()
+            }).catch(err => console.error("Error setting online status:", err));
+          } else {
+            updateDoc(userRef, {
+              isOnline: false,
+              online: false
+            }).catch(() => {});
+          }
+        }).catch(() => {
+          updateDoc(userRef, {
+            isOnline: true,
+            online: true,
+            lastSeen: serverTimestamp()
+          }).catch(() => {});
+        });
 
         // Define event handlers
         const setOffline = () => {
@@ -88,6 +115,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const setOnline = () => {
           if (auth.currentUser) {
+            if (userProfileRef.current?.isBanned) {
+              updateDoc(userRef, {
+                isOnline: false,
+                online: false
+              }).catch(() => {});
+              return;
+            }
             updateDoc(userRef, {
               isOnline: true,
               online: true,
