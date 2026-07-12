@@ -372,24 +372,35 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
           const reader = response.body?.getReader();
           const decoder = new TextDecoder();
           let aiFullText = '';
+          let buffer = '';
           
           if (reader) {
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n');
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const dataStr = line.slice(6);
-                  if (dataStr.trim() === '[DONE]') break;
-                  try {
-                    const parsed = JSON.parse(dataStr);
-                    if (parsed.text) {
-                      aiFullText += parsed.text;
-                      setAiState(prev => ({ ...prev, streamText: aiFullText }));
+              
+              buffer += decoder.decode(value, { stream: true });
+              
+              let newlineIndex;
+              while ((newlineIndex = buffer.indexOf('\n\n')) >= 0) {
+                const sseMessage = buffer.slice(0, newlineIndex).trim();
+                buffer = buffer.slice(newlineIndex + 2);
+                
+                const lines = sseMessage.split('\n');
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6);
+                    if (dataStr.trim() === '[DONE]') break;
+                    try {
+                      const parsed = JSON.parse(dataStr);
+                      if (parsed.text) {
+                        aiFullText += parsed.text;
+                        setAiState(prev => ({ ...prev, streamText: aiFullText }));
+                      }
+                    } catch (e) {
+                      console.error("Parse error:", e, dataStr);
                     }
-                  } catch (e) {}
+                  }
                 }
               }
             }
@@ -397,20 +408,24 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
           
           setAiState({ isGenerating: false, isThinking: false, streamText: '' });
           
-          const aiNow = Date.now();
-          const aiMsgId = aiNow.toString() + Math.random().toString(36).substring(2, 5);
-          await setDoc(doc(db, `chats/${chat.id}/messages`, aiMsgId), {
-             id: aiMsgId,
-             senderId: TALKO_AI_USER_ID,
-             text: aiFullText,
-             imageUrl: null,
-             timestamp: aiNow
-          });
-          await updateDoc(chatRef, {
-             lastMessage: aiFullText,
-             lastMessageTimestamp: aiNow,
-             updatedAt: aiNow
-          });
+          if (aiFullText.trim()) {
+            const aiNow = Date.now();
+            const aiMsgId = aiNow.toString() + Math.random().toString(36).substring(2, 5);
+            await setDoc(doc(db, `chats/${chat.id}/messages`, aiMsgId), {
+               id: aiMsgId,
+               senderId: TALKO_AI_USER_ID,
+               text: aiFullText,
+               imageUrl: null,
+               timestamp: aiNow
+            });
+            await updateDoc(chatRef, {
+               lastMessage: aiFullText,
+               lastMessageTimestamp: aiNow,
+               updatedAt: aiNow
+            });
+          } else {
+            throw new Error("AI returned empty response");
+          }
         } catch (err) {
           console.error("AI chat error:", err);
           toast.error("Talko AI yanıt veremedi.");
