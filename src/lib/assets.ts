@@ -32,3 +32,18 @@ export const TALKO_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="
 </svg>`;
 
 export const TALKO_LOGO_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent(TALKO_LOGO_SVG)}`;
+
+export const TALKO_AI_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+  <!-- Rounded dark background -->
+  <rect width="1000" height="1000" rx="220" fill="#111827" />
+  <!-- A modern AI bot icon/sparkle or similar in gold/blue -->
+  <path d="M500 200 L540 400 L740 440 L540 480 L500 680 L460 480 L260 440 L460 400 Z" fill="#F59E0B" />
+  <circle cx="500" cy="440" r="80" fill="#3B82F6" />
+</svg>`;
+export const TALKO_AI_LOGO_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent(TALKO_AI_SVG)}`;
+
+export const TALKO_VERIFIED_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+  <circle cx="500" cy="500" r="450" fill="#F59E0B" />
+  <path d="M 300 500 L 450 650 L 700 350" stroke="#FFFFFF" stroke-width="120" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+</svg>`;
+export const TALKO_VERIFIED_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent(TALKO_VERIFIED_SVG)}`;

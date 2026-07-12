@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, getDocs, setDoc, doc, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { LogOut, User as UserIcon, Search, MessageSquarePlus, BadgeCheck, Moon, Sun } from 'lucide-react';
+import { LogOut, User as UserIcon, Search, MessageSquarePlus, Moon, Sun } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Chat, User } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { SYSTEM_USER_ID, ensureSystemAccount, sendWelcomeMessageIfNeeded } from '../lib/systemAccount';
-import { TALKO_LOGO_DATA_URL } from '../lib/assets';
+import { SYSTEM_USER_ID, TALKO_AI_USER_ID, ensureSystemAccount, sendWelcomeMessageIfNeeded } from '../lib/systemAccount';
+import { TALKO_LOGO_DATA_URL, TALKO_AI_LOGO_DATA_URL } from '../lib/assets';
 import { cn } from '../lib/utils';
+import { VerifiedBadge } from './VerifiedBadge';
 
 interface SidebarProps {
   onChatSelect: (chat: Chat) => void;
@@ -160,9 +161,12 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
   const filteredChats = visibleChats.filter(chat => {
     const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
     const isSystem = otherUserId === SYSTEM_USER_ID;
+    const isAi = otherUserId === TALKO_AI_USER_ID;
     const userObj = otherUserId === currentUser?.uid ? userProfile : allUsers.find(u => u.uid === otherUserId);
     const otherUser = isSystem 
-      ? { username: 'Talko Destek' }
+      ? { username: 'Talko Updates' }
+      : isAi
+      ? { username: 'Talko AI' }
       : (userObj || chat.participantDetails?.[otherUserId || ''] || {});
     return otherUser?.username?.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -178,11 +182,15 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
     if (!otherUserId) return null;
     
     const isSystem = otherUserId === SYSTEM_USER_ID;
+    const isAi = otherUserId === TALKO_AI_USER_ID;
+    const isVerified = isSystem || isAi;
     
     // Get latest user object for status and profile photo/username sync
     const userObj = otherUserId === currentUser?.uid ? userProfile : allUsers.find(u => u.uid === otherUserId);
     const otherUser = isSystem 
-      ? { username: 'Talko Destek', photoURL: TALKO_LOGO_DATA_URL }
+      ? { username: 'Talko Updates', photoURL: TALKO_LOGO_DATA_URL }
+      : isAi
+      ? { username: 'Talko AI', photoURL: TALKO_AI_LOGO_DATA_URL }
       : (userObj || chat.participantDetails?.[otherUserId] || {});
     const isOnline = userObj ? (userObj.isOnline || (userObj as any).online) : false;
     
@@ -209,7 +217,9 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
         <div className="relative w-12 h-12 flex-shrink-0">
           <div className="w-full h-full rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
             {isSystem ? (
-              <img src={TALKO_LOGO_DATA_URL} alt="Talko Destek" className="w-full h-full object-cover" />
+              <img src={TALKO_LOGO_DATA_URL} alt="Talko Updates" className="w-full h-full object-cover" />
+            ) : isAi ? (
+              <img src={TALKO_AI_LOGO_DATA_URL} alt="Talko AI" className="w-full h-full object-cover" />
             ) : otherUser?.photoURL ? (
               <img src={otherUser.photoURL} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -218,7 +228,7 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
               </div>
             )}
           </div>
-          {isOnline && !isSystem && (
+          {isOnline && !isVerified && (
             <span className="absolute bottom-0 right-0 block w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-white dark:border-gray-900 shadow-sm z-10 animate-pulse" />
           )}
         </div>
@@ -226,7 +236,7 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
           <div className="flex items-center justify-between mb-0.5 min-w-0">
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{otherUser?.username}</p>
-              {isSystem && <BadgeCheck size={16} className="text-blue-500 fill-blue-500/10 dark:text-blue-400 dark:fill-blue-400/10 flex-shrink-0" />}
+              {isVerified && <VerifiedBadge className="w-4 h-4 flex-shrink-0" />}
             </div>
             <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap ml-2 flex-shrink-0">
               {timeString.replace('yaklaşık ', '')}
@@ -244,6 +254,10 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
   };
 
   const renderUserButton = (user: User) => {
+    const isSystem = user.uid === SYSTEM_USER_ID;
+    const isAi = user.uid === TALKO_AI_USER_ID;
+    const isVerified = isSystem || isAi;
+
     return (
       <button
         key={user.uid}
@@ -260,12 +274,15 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
               </div>
             )}
           </div>
-          {(user.isOnline || (user as any).online) && (
+          {(user.isOnline || (user as any).online) && !isVerified && (
             <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900 shadow-sm z-10 animate-pulse" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 dark:text-gray-100 truncate w-full">{user.username}</p>
+          <div className="flex items-center gap-1.5 w-full">
+            <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{user.username}</p>
+            {isVerified && <VerifiedBadge className="w-4 h-4 flex-shrink-0" />}
+          </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 truncate w-full">{user.about || 'Merhaba!'}</p>
         </div>
         <MessageSquarePlus size={18} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-2" />

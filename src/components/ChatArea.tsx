@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { ArrowLeft, Send, Image as ImageIcon, Smile, BadgeCheck, User as UserIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Image as ImageIcon, Smile, User as UserIcon, Loader2 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,11 +9,12 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Chat, Message } from '../types';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { SYSTEM_USER_ID } from '../lib/systemAccount';
-import { TALKO_LOGO_DATA_URL } from '../lib/assets';
+import { SYSTEM_USER_ID, TALKO_AI_USER_ID } from '../lib/systemAccount';
+import { TALKO_LOGO_DATA_URL, TALKO_AI_LOGO_DATA_URL } from '../lib/assets';
 import { cn } from '../lib/utils';
 import { uploadImage } from '../lib/imgbb';
 import toast from 'react-hot-toast';
+import { VerifiedBadge } from './VerifiedBadge';
 
 interface ChatAreaProps {
   key?: string;
@@ -32,6 +33,10 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<number | null>(null);
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
   const [liveOtherUser, setLiveOtherUser] = useState<any>(null);
+  
+  // AI State
+  const [aiState, setAiState] = useState({ isGenerating: false, isThinking: false, streamText: '' });
+
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTypingTimeRef = useRef<number>(0);
   const lastMyTypingWriteRef = useRef<number>(0);
@@ -44,8 +49,13 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
 
   const otherUserId = chat?.participants?.find(id => id !== currentUser?.uid) || currentUser?.uid;
   const isSystemChat = otherUserId === SYSTEM_USER_ID;
+  const isAiChat = otherUserId === TALKO_AI_USER_ID;
+  const isVerified = isSystemChat || isAiChat;
+
   const otherUserDetails = isSystemChat 
-    ? { username: 'Talko Destek', photoURL: TALKO_LOGO_DATA_URL }
+    ? { username: 'Talko Updates', photoURL: TALKO_LOGO_DATA_URL }
+    : isAiChat
+    ? { username: 'Talko AI', photoURL: TALKO_AI_LOGO_DATA_URL }
     : (otherUserId === currentUser?.uid 
         ? userProfile 
         : (liveOtherUser || chat?.participantDetails?.[otherUserId || ''] || {}));
@@ -339,6 +349,75 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
         updatedAt: now
       });
       
+      if (isAiChat) {
+        setAiState({ isGenerating: true, isThinking: true, streamText: '' });
+        try {
+          const history = messages.map(m => ({
+            role: m.senderId === TALKO_AI_USER_ID ? 'model' : 'user',
+            text: m.text || ''
+          }));
+          
+          const response = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: messageText, history })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`AI API Error: ${response.status}`);
+          }
+          
+          setAiState(prev => ({ ...prev, isThinking: false }));
+          
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let aiFullText = '';
+          
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const dataStr = line.slice(6);
+                  if (dataStr.trim() === '[DONE]') break;
+                  try {
+                    const parsed = JSON.parse(dataStr);
+                    if (parsed.text) {
+                      aiFullText += parsed.text;
+                      setAiState(prev => ({ ...prev, streamText: aiFullText }));
+                    }
+                  } catch (e) {}
+                }
+              }
+            }
+          }
+          
+          setAiState({ isGenerating: false, isThinking: false, streamText: '' });
+          
+          const aiNow = Date.now();
+          const aiMsgId = aiNow.toString() + Math.random().toString(36).substring(2, 5);
+          await setDoc(doc(db, `chats/${chat.id}/messages`, aiMsgId), {
+             id: aiMsgId,
+             senderId: TALKO_AI_USER_ID,
+             text: aiFullText,
+             imageUrl: null,
+             timestamp: aiNow
+          });
+          await updateDoc(chatRef, {
+             lastMessage: aiFullText,
+             lastMessageTimestamp: aiNow,
+             updatedAt: aiNow
+          });
+        } catch (err) {
+          console.error("AI chat error:", err);
+          toast.error("Talko AI yanıt veremedi.");
+          setAiState({ isGenerating: false, isThinking: false, streamText: '' });
+        }
+      }
+
     } catch (err) {
       console.error(err);
       toast.error("Mesaj gönderilemedi.");
@@ -391,7 +470,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
           <div className="relative w-10 h-10 flex-shrink-0">
             <div className="w-full h-full rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
               {isSystemChat ? (
-                <img src={TALKO_LOGO_DATA_URL} alt="Talko Destek" className="w-full h-full object-cover" />
+                <img src={TALKO_LOGO_DATA_URL} alt="Talko Updates" className="w-full h-full object-cover" />
+              ) : isAiChat ? (
+                <img src={TALKO_AI_LOGO_DATA_URL} alt="Talko AI" className="w-full h-full object-cover" />
               ) : otherUserDetails?.photoURL ? (
                 <img src={otherUserDetails.photoURL} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -400,7 +481,7 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
                 </div>
               )}
             </div>
-            {otherUserOnline && !isSystemChat && (
+            {otherUserOnline && !isVerified && (
               <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900 shadow-sm z-10" />
             )}
           </div>
@@ -410,10 +491,11 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               <h2 className="font-semibold text-gray-900 dark:text-white leading-tight truncate">
                 {otherUserDetails?.username}
               </h2>
-              {isSystemChat && <BadgeCheck size={18} className="text-blue-500 fill-blue-500/10 dark:text-blue-400 dark:fill-blue-400/10 flex-shrink-0" />}
+              {isVerified && <VerifiedBadge className="w-4 h-4 flex-shrink-0" />}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {isSystemChat ? 'Resmi Sistem Hesabı' : 
+              {isSystemChat ? 'Talko Resmi Hesabı' : 
+               isAiChat ? (aiState.isGenerating ? <span className="text-blue-500 dark:text-blue-400 italic">Düşünüyor...</span> : 'Resmî Yapay Zekâ Asistanı') :
                otherUserDetails?.isBanned ? 'Çevrimdışı' :
                isOtherUserTyping ? <span className="text-blue-500 dark:text-blue-400 italic">yazıyor...</span> :
                otherUserOnline ? <span className="text-blue-600 dark:text-blue-400 font-medium">Çevrimiçi</span> : 
@@ -443,7 +525,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
               {!isMine && showAvatar && (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mr-2 mt-auto bg-gray-100 dark:bg-gray-800">
                    {isSystemChat ? (
-                     <img src={TALKO_LOGO_DATA_URL} alt="Talko Destek" className="w-full h-full object-cover" />
+                     <img src={TALKO_LOGO_DATA_URL} alt="Talko Updates" className="w-full h-full object-cover" />
+                   ) : msg.senderId === TALKO_AI_USER_ID ? (
+                     <img src={TALKO_AI_LOGO_DATA_URL} alt="Talko AI" className="w-full h-full object-cover" />
                    ) : otherUserDetails?.photoURL ? (
                      <img src={otherUserDetails.photoURL} alt="" className="w-full h-full object-cover" />
                    ) : (
@@ -496,12 +580,35 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             </div>
           );
         })}
-        {isOtherUserTyping && (
+        
+        {isOtherUserTyping && !isAiChat && (
           <div className="flex justify-start pl-10 w-full">
             <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"></span>
               <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
               <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+            </div>
+          </div>
+        )}
+
+        {isAiChat && aiState.isGenerating && (
+          <div className="flex w-full min-w-0 px-0.5 justify-start">
+            <div className={cn("w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mr-2 mt-auto bg-gray-100 dark:bg-gray-800 transition-transform duration-1000", aiState.isThinking && "animate-breathe")}>
+              <img src={TALKO_AI_LOGO_DATA_URL} alt="Talko AI" className="w-full h-full object-cover" />
+            </div>
+            <div className="max-w-[75%] md:max-w-[65%] min-w-0 rounded-2xl px-4 py-2.5 shadow-sm relative group break-words bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-100 dark:border-gray-700 rounded-bl-sm">
+              {aiState.isThinking ? (
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span className="text-sm font-medium">Düşünüyor...</span>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+                  <span className="animate-shimmer-text">
+                    {aiState.streamText}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -514,10 +621,10 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
             <span className="text-xl select-none" role="img" aria-label="lock">🔒</span>
             <div className="text-left">
               <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-0.5">
-                Talko Destek
+                Talko Updates
               </h4>
               <p className="text-xs text-blue-800/85 dark:text-blue-400/85 leading-relaxed">
-                Bu doğrulanmış Talko Destek hesabıdır. Bu sohbet yalnızca resmî duyurular ve sistem bilgilendirmeleri için kullanılır. Bu hesaba mesaj gönderilemez.
+                Bu doğrulanmış Talko Updates hesabıdır. Bu sohbet yalnızca resmî duyurular ve sistem bilgilendirmeleri için kullanılır. Bu hesaba mesaj gönderilemez.
               </p>
             </div>
           </div>

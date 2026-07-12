@@ -30,6 +30,19 @@ export default function AuthScreen() {
         }
 
         const usernameLower = username.toLowerCase();
+        
+        // Reserved usernames check
+        const reservedNames = [
+          'talko', 'talko ai', 'talko updates', 'talko official', 
+          'talko support', 'talko helpdesk', 'talko verified'
+        ];
+        
+        if (reservedNames.some(name => usernameLower.includes(name))) {
+          toast.error("Bu kullanıcı adı alınamaz. Lütfen başka bir ad seçin.");
+          setLoading(false);
+          return;
+        }
+
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where('usernameLower', '==', usernameLower));
         const querySnapshot = await getDocs(q);
