@@ -364,7 +364,8 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
           });
           
           if (!response.ok) {
-            throw new Error(`AI API Error: ${response.status}`);
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `AI API Error: ${response.status}`);
           }
           
           setAiState(prev => ({ ...prev, isThinking: false }));
@@ -426,9 +427,9 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
           } else {
             throw new Error("AI returned empty response");
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("AI chat error:", err);
-          toast.error("Talko AI yanıt veremedi.");
+          toast.error(err.message || "Talko AI yanıt veremedi.");
           setAiState({ isGenerating: false, isThinking: false, streamText: '' });
         }
       }

@@ -59,7 +59,7 @@ service cloud.firestore {
         // Create: must be participant or admin, and senderId must match
         allow create: if isAuthenticated() && isNotBanned()
                      && (isAdmin() || chatId.matches('.*' + request.auth.uid + '.*'))
-                     && (request.resource.data.senderId == request.auth.uid || request.resource.data.senderId == 'system_talko_destek' || isAdmin());
+                     && (request.resource.data.senderId == request.auth.uid || request.resource.data.senderId == 'system_talko_destek' || request.resource.data.senderId == 'system_talko_ai' || isAdmin());
         // Only admin can delete messages
         allow update, delete: if isAdmin();
       }

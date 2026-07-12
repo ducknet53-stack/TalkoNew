@@ -9,37 +9,26 @@ export const TALKO_LOGO_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent
 
 export const TALKO_AI_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0B0F19" />
-      <stop offset="100%" stop-color="#1A2238" />
+    <linearGradient id="aiBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#7C3AED" />
     </linearGradient>
-    <linearGradient id="aiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3B82F6" />
-      <stop offset="50%" stop-color="#6366F1" />
-      <stop offset="100%" stop-color="#8B5CF6" />
-    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
   </defs>
-
-  <!-- Background -->
-  <circle cx="50" cy="50" r="50" fill="url(#bgGrad)" />
   
-  <!-- Ambient Glow Ring -->
-  <circle cx="50" cy="50" r="44" fill="none" stroke="url(#aiGrad)" stroke-width="1.5" opacity="0.3" />
+  <rect width="100" height="100" fill="url(#aiBg)" />
   
-  <!-- AI Core Bubble/Head -->
-  <path d="M 22 48 C 22 30, 78 30, 78 48 L 78 58 C 78 72, 60 76, 50 82 C 40 76, 22 72, 22 58 Z" fill="url(#aiGrad)" opacity="0.9" />
+  <!-- Sleek 4-pointed star / spark -->
+  <path d="M 50 15 C 50 45 45 50 15 50 C 45 50 50 55 50 85 C 50 55 55 50 85 50 C 55 50 50 45 50 15 Z" fill="#FFFFFF" filter="url(#glow)"/>
+  <path d="M 50 15 C 50 45 45 50 15 50 C 45 50 50 55 50 85 C 50 55 55 50 85 50 C 55 50 50 45 50 15 Z" fill="#FFFFFF"/>
   
-  <!-- Inner Face Plate -->
-  <path d="M 28 50 C 28 38, 72 38, 72 50 L 72 56 C 72 65, 28 65, 28 56 Z" fill="#0B0F19" />
-  
-  <!-- Glowing Eyes -->
-  <rect x="38" y="46" width="6" height="12" rx="3" fill="#60A5FA" />
-  <rect x="56" y="46" width="6" height="12" rx="3" fill="#60A5FA" />
-  
-  <!-- Center Star/Sparkle -->
-  <path d="M 50 14 L 52.5 23.5 L 62 26 L 52.5 28.5 L 50 38 L 47.5 28.5 L 38 26 L 47.5 23.5 Z" fill="#FBBF24" />
+  <path d="M 75 25 C 75 35 72 38 62 38 C 72 38 75 41 75 51 C 75 41 78 38 88 38 C 78 38 75 35 75 25 Z" fill="#FFFFFF" opacity="0.8"/>
+  <path d="M 30 70 C 30 77 28 79 21 79 C 28 79 30 81 30 88 C 30 81 32 79 39 79 C 32 79 30 77 30 70 Z" fill="#FFFFFF" opacity="0.6"/>
 </svg>`;
-export const TALKO_AI_LOGO_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent(TALKO_AI_SVG)}`;
+export const TALKO_AI_LOGO_DATA_URL = `data:image/svg+xml;base64,${btoa(TALKO_AI_SVG)}`;
 
 export const TALKO_VERIFIED_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
   <circle cx="500" cy="500" r="450" fill="#F59E0B" />

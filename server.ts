@@ -8,14 +8,18 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Initialize GitHub Models OpenAI client
-const ai = new OpenAI({
-  baseURL: 'https://models.inference.ai.azure.com',
-  apiKey: process.env.GITHUB_TOKEN || 'dummy_key',
-});
-
 app.post('/api/ai/chat', async (req, res) => {
   try {
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      throw new Error("GITHUB_TOKEN is not set in environment variables.");
+    }
+    
+    const ai = new OpenAI({
+      baseURL: 'https://models.inference.ai.azure.com',
+      apiKey: token,
+    });
+    
     const { message, history } = req.body;
     
     const formattedHistory = history.map((msg: any) => ({
