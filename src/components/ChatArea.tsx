@@ -42,13 +42,13 @@ export default function ChatArea({ chat, onBack }: ChatAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevMessagesLengthRef = useRef(0);
 
-  const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
+  const otherUserId = chat?.participants?.find(id => id !== currentUser?.uid) || currentUser?.uid;
   const isSystemChat = otherUserId === SYSTEM_USER_ID;
   const otherUserDetails = isSystemChat 
     ? { username: 'Talko Destek', photoURL: TALKO_LOGO_DATA_URL }
     : (otherUserId === currentUser?.uid 
         ? userProfile 
-        : (liveOtherUser || chat.participantDetails[otherUserId || ''] || {}));
+        : (liveOtherUser || chat?.participantDetails?.[otherUserId || ''] || {}));
 
   useEffect(() => {
     if (!currentUser) return;

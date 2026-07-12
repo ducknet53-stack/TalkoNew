@@ -143,13 +143,14 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
 
   // Instant local filtering
   const filteredChats = chats.filter(chat => {
+    if (!chat || !chat.participants) return false;
     const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
     const isSystem = otherUserId === SYSTEM_USER_ID;
     const userObj = otherUserId === currentUser?.uid ? userProfile : allUsers.find(u => u.uid === otherUserId);
     if (userObj?.isBanned) return false;
     const otherUser = isSystem 
       ? { username: 'Talko Destek' }
-      : (userObj || chat.participantDetails[otherUserId || ''] || {});
+      : (userObj || chat.participantDetails?.[otherUserId || ''] || {});
     return otherUser?.username?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
@@ -161,6 +162,7 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
   );
 
   const renderChatButton = (chat: Chat) => {
+    if (!chat || !chat.participants) return null;
     const otherUserId = chat.participants.find(id => id !== currentUser?.uid) || currentUser?.uid;
     if (!otherUserId) return null;
     
@@ -170,12 +172,16 @@ export default function Sidebar({ onChatSelect, activeChatId, onOpenProfile }: S
     const userObj = otherUserId === currentUser?.uid ? userProfile : allUsers.find(u => u.uid === otherUserId);
     const otherUser = isSystem 
       ? { username: 'Talko Destek', photoURL: TALKO_LOGO_DATA_URL }
-      : (userObj || chat.participantDetails[otherUserId] || {});
+      : (userObj || chat.participantDetails?.[otherUserId] || {});
     const isOnline = userObj ? (userObj.isOnline || (userObj as any).online) : false;
     
     let timeString = '';
     if (chat.lastMessageTimestamp) {
-      timeString = formatDistanceToNow(chat.lastMessageTimestamp, { addSuffix: true, locale: tr });
+      try {
+        timeString = formatDistanceToNow(chat.lastMessageTimestamp, { addSuffix: true, locale: tr });
+      } catch (err) {
+        console.error("Error formatting distance to now:", err);
+      }
     }
 
     return (
